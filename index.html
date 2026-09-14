@@ -131,7 +131,7 @@
         <div class="w-full bg-white p-6 rounded-2xl shadow-sm text-center">
             
             <div class="bg-gray-50 p-4 rounded-xl mb-6 border border-gray-100">
-                <h3 class="text-emerald-600 font-bold mb-3 text-left px-2 text-xl">📅 식단표(Excel) 업로드</h3>
+                <h3 class="text-emerald-600 font-bold mb-3 text-left px-2 text-xl">📅 식단표(Excel) 업로</h3>
                 <div class="flex flex-col md:flex-row gap-3 items-center">
                     <label class="custom-file-upload w-full md:w-auto text-xl hover:bg-gray-100 !border-gray-300 !text-gray-600 flex-1">
                         <input type="file" id="excel-upload" accept=".xlsx, .xls">
@@ -154,7 +154,7 @@
                 <div class="flex justify-between items-center mb-2">
                     <label for="menu-input" class="text-pink-400 font-bold text-2xl block">오늘의 식단 <span class="text-gray-400 text-lg font-normal">(수기입력가능)</span></label>
                 </div>
-                <textarea id="menu-input" rows="3" class="w-full p-4 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-400 text-2xl text-gray-700 placeholder-gray-300 transition-colors bg-pink-50/30 resize-none" placeholder="예: 기장밥&#10;쇠고기미역국&#10;배추김치..."></textarea>
+                <textarea id="menu-input" rows="3" class="w-full p-4 border-2 border-pink-200 rounded-xl focus:outline-none focus:border-pink-400 text-2xl text-gray-700 placeholder-gray-300 transition-colors bg-pink-50/30 resize-none" placeholder="예: 기장밥&#13;&#10;쇠고기미역국&#13;&#10;배추김치..."></textarea>
             </div>
 
             <div class="flex flex-col sm:flex-row gap-4 mb-6">
@@ -519,81 +519,52 @@
             reader.readAsDataURL(file);
         }
 
-        let isProcessing = false;
-
         // Transform button click handler
-        transformBtn.addEventListener('click', async () => {
-            if (isProcessing) return;
+        transformBtn.addEventListener('click', () => {
             if (!currentSelectedImageObj) {
                 showError("이미지를 먼저 업로드하거나 붙여넣어주세요.");
                 return;
             }
             
+            // Hide the status section during processing
+            imageStatus.classList.add('hidden');
+            resultContainer.style.display = 'block';
+            
             // Start processing
-            await processImage(currentSelectedImageObj, currentSelectedFile.type);
+            processImage(currentSelectedImageObj, currentSelectedFile.type);
         });
 
         async function processImage(userImage, mimeType) {
-            if (isProcessing) return;
-            isProcessing = true;
-            transformBtn.disabled = true;
-            transformBtn.classList.add('opacity-50', 'cursor-not-allowed');
-
             showLoading();
-            imageStatus.classList.add('hidden');
-            resultContainer.style.display = 'block';
 
             try {
                 const base64Image = getBase64Image(userImage);
                 const pureBase64 = base64Image.split(',')[1];
-                const menuText = menuInput.value.trim();
 
-                // 💡 [토큰/비용 절감] 동일 식판 사진 및 식단 재분석 시 sessionStorage 캐시 우선 활용 (API 호출 0원)
-                const cacheKey = `haccp_cache_${base64Image.length}_${base64Image.slice(-40)}_${menuText}`;
-                let foodData = null;
-                const cached = sessionStorage.getItem(cacheKey);
-
-                if (cached) {
-                    try {
-                        foodData = JSON.parse(cached);
-                        console.log("⚡ [캐시 적중] 저장된 분석 결과를 즉시 사용하여 토큰 소모 및 API 과금을 방지했습니다.");
-                    } catch (e) {
-                        foodData = null;
-                    }
-                }
-
-                if (!foodData) {
-                    foodData = await analyzeFoodImage(pureBase64, mimeType);
-                    try {
-                        sessionStorage.setItem(cacheKey, JSON.stringify(foodData));
-                    } catch (e) {
-                        console.warn("캐시 저장 한도 초과 또는 비활성화:", e);
-                    }
-                }
-
+                const foodData = await analyzeFoodImage(pureBase64, mimeType);
                 globalFoodData = foodData; // Store globally for editing
+                
                 await drawFinalImage(userImage, globalFoodData);
                 
                 hideLoading();
                 actionButtons.classList.remove('hidden');
+                
+                // Scroll to see the result
                 resultContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
             } catch (error) {
                 console.error("Error processing image:", error);
                 showError("이미지 처리 중 오류가 발생했습니다: " + error.message);
                 hideLoading();
+                // Even on error, let's try to just draw the image on the background so it's not totally broken
                 drawFallbackImage(userImage);
-            } finally {
-                isProcessing = false;
-                transformBtn.disabled = false;
-                transformBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
         }
 
         function getBase64Image(img) {
             // Create a temporary canvas to resize image if it's too large before sending to API
             const tempCanvas = document.createElement('canvas');
-            const MAX_SIZE = 512;
+            const MAX_SIZE = 1024;
             let width = img.width;
             let height = img.height;
 
@@ -624,31 +595,43 @@
 
             // 2. 💡 가장 강력한 통제 문구 (개수 일치 강제)
             const countInstruction = menuCount > 0 
-                ? `\n[가장 중요한 규칙: 반드시 ${menuCount}개의 결과를 생성할 것!] 사용자가 입력한 식단은 총 ${menuCount}개입니다. 눈에 안 보이거나 칸을 벗어난 음식이라도 누락하지 말고, 반드시 입력된 ${menuCount}개와 정확히 1:1로 매칭하여 ${menuCount}개의 JSON 객체를 반환하세요.` 
+                ? `\n[가장 중요한 규칙: 반드시 ${menuCount}개의 결과를 생성할 것!] 사용자가 입력한 식단은 총 ${menuCount}개입니다. 눈에 안 보이거나 칸을 벗어난 음식(난, 소스, 음료 등)이라도 절대 누락하지 말고, 반드시 입력된 ${menuCount}개와 정확히 1:1로 매칭하여 ${menuCount}개의 JSON 객체를 반환하세요.` 
                 : '';
 
             const menuContext = menuText ? `\n사용자가 입력한 실제 식단 메뉴: [${menuText}]` : '';
 
-            // 3. 💡 고정 시스템 지침 (System Instruction) 분리로 토큰 압축 및 캐싱 최적화
-            const systemInstructionText = `당신은 학교급식 식판 사진을 분석하는 전문가입니다.
-식판 사진과 식단 메뉴를 분석하여 각 음식의 이름(name), 짧은 설명(desc), 중심점 위치(pos: {x, y})를 JSON 배열로 반환하세요.
-[규칙]
-1. 실제 식단 메뉴가 제시된 경우 임의로 이름을 바꾸지 말고 제시된 이름을 그대로 사용하세요.
-2. 설명(desc): 맛/식감 강조(재미) 또는 영양/효능(유익) 중 1가지 스타일만 선택하여 최대 1~2줄(공백 제외 25자 내외)로 짧게 작성하세요. 문장 끝은 체언(명사)으로 종결하고, 줄바꿈이 필요하면 '\\n'을 넣으세요.
-3. 위치(pos): 이미지 좌상단 (0.0, 0.0) ~ 우하단 (1.0, 1.0) 비율의 대략적 중심 좌표입니다.
-4. 응답은 반드시 JSON 배열만 반환하세요: [{"name":"음식명", "desc":"설명\\n한줄더", "pos":{"x":0.5, "y":0.5}}]`;
+            // 3. 💡 프롬프트 수정
+            const prompt = `
+            사용자가 식판에 담긴 급식 사진을 업로드했습니다.${menuContext}${countInstruction}
+            이 사진을 분석하여 식판에 담긴 각 음식의 이름, 짧은 설명, 그리고 사진 상에서 해당 음식이 있는 대략적인 중심점 위치(x, y 비율)를 알려주세요.
+    
+            [중요 규칙]
+            1. '사용자가 입력한 실제 식단 메뉴'가 있다면, 임의로 이름을 바꾸지 말고 제시된 메뉴 이름을 그대로 사용하세요.
+            2. 설명 작성 규칙 (매우 중요):
+               - 각 음식마다 아래 두 가지 스타일 중 **무작위로 딱 하나만** 선택해서 작성하세요. (절대 두 가지 내용을 한 음식에 섞지 마세요!)
+                 * 스타일 A: 맛이나 식감을 강조하는 통통 튀는 재미있는 설명
+                 * 스타일 B: 주요 영양소나 건강 효능을 알려주는 유익한 설명
+               - 화면에 글자가 겹치지 않도록 **최대 1~2줄(25자 내외)로 짧게** 핵심만 적어주세요.
+               - 문장의 끝은 반드시 명사형으로 종결하세요 (예: ~함, ~음, ~일품, ~반찬 등).
+               - 줄바꿈이 필요한 곳에는 반드시 '\\n'을 넣어주세요. (예: "비타민 듬뿍!\\n피로 회복에 최고")
+            3. 위치(x, y)는 이미지의 좌측 상단을 (0.0, 0.0), 우측 하단을 (1.0, 1.0)으로 했을 때의 상대적인 비율 값입니다. 사진에서 형태를 찾기 힘들면 대략적인 빈 공간(예: 0.1, 0.1)으로라도 좌표를 찍어서 무조건 포함해야 합니다.
+    
+            응답은 반드시 아래 형식의 JSON 배열로만 해주세요. 다른 텍스트는 포함하지 마세요.
+            [
+              {
+                "name": "음식 이름",
+                "description": "짧은 설명 (줄바꿈 \\n 포함)",
+                "position": { "x": 0.8, "y": 0.7 }
+              }
+            ]
+            `;
 
-            const userPrompt = `사용자가 식판에 담긴 급식 사진을 업로드했습니다.${menuContext}${countInstruction}`;
-
-            const payload = {
-                systemInstruction: {
-                    parts: [{ text: systemInstructionText }]
-                },
+        const payload = {
                 contents: [
                     {
                         role: "user",
                         parts: [
-                            { text: userPrompt },
+                            { text: prompt },
                             {
                                 inlineData: {
                                     mimeType: mimeType || "image/jpeg",
@@ -659,8 +642,7 @@
                     }
                 ],
                 generationConfig: {
-                    responseMimeType: "application/json",
-                    maxOutputTokens: 2048 // 충분한 토큰 한도로 JSON 잘림 방지 (실제 생성된 토큰만 과금됨)
+                    responseMimeType: "application/json"
                 }
             };
 
@@ -685,9 +667,7 @@
                         await new Promise(r => setTimeout(r, delay));
                         delay *= 2;
                     } else {
-                        const errData = await response.json().catch(() => null);
-                        const errMsg = errData?.error?.message || `API error: ${response.status}`;
-                        throw new Error(errMsg);
+                         throw new Error(`API error: ${response.status}`);
                     }
                 }
 
@@ -701,54 +681,11 @@
                     result.candidates[0].content && result.candidates[0].content.parts &&
                     result.candidates[0].content.parts.length > 0) {
                     
-                    // 마크다운 블록 및 복수 파트/Thinking 파트 분리 처리
-                    const textParts = result.candidates[0].content.parts.filter(p => p.text && !p.thought);
-                    const rawText = textParts.length > 0 
-                        ? textParts.map(p => p.text).join('\n') 
-                        : result.candidates[0].content.parts[0].text;
-
-                    function parseFoodJsonResponse(text) {
-                        if (!text) throw new Error("Empty text in response");
-                        let cleaned = text.trim();
-                        // 마크다운 코드블록 제거
-                        if (cleaned.startsWith('```')) {
-                            cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-                        }
-
-                        try {
-                            return JSON.parse(cleaned);
-                        } catch (e1) {
-                            // 대괄호 [ ... ] 영역만 추출 시도
-                            const start = cleaned.indexOf('[');
-                            const end = cleaned.lastIndexOf(']');
-                            if (start !== -1 && end !== -1 && end > start) {
-                                try {
-                                    return JSON.parse(cleaned.slice(start, end + 1));
-                                } catch (e2) {}
-                            }
-                            // 문장이 중간에 잘린 경우 마지막 정상 객체까지 복원
-                            if (start !== -1) {
-                                const lastBrace = cleaned.lastIndexOf('}');
-                                if (lastBrace !== -1 && lastBrace > start) {
-                                    try {
-                                        return JSON.parse(cleaned.slice(start, lastBrace + 1) + ']');
-                                    } catch (e3) {}
-                                }
-                            }
-                            throw e1;
-                        }
-                    }
-
+                    const jsonString = result.candidates[0].content.parts[0].text;
                     try {
-                        const parsed = parseFoodJsonResponse(rawText);
-                        // 💡 [호환성 보장] 토큰 절약형 필드(desc, pos)를 기존 렌더링 규격(description, position)으로 자동 매핑
-                        return (Array.isArray(parsed) ? parsed : []).map(item => ({
-                            name: item.name || '',
-                            description: item.desc || item.description || '',
-                            position: item.pos || item.position || { x: 0.5, y: 0.5 }
-                        }));
+                        return JSON.parse(jsonString);
                     } catch (e) {
-                         console.error("Failed to parse JSON:", rawText);
+                         console.error("Failed to parse JSON:", jsonString);
                          throw new Error("API returned invalid JSON format.");
                     }
                 } else {
@@ -762,10 +699,6 @@
         }
 
         async function drawFinalImage(userImage, foodData) {
-            if (document.fonts) {
-                await document.fonts.ready;
-            }
-
             // Clear previous click detection boxes
             drawnBoxes = [];
 
@@ -780,8 +713,8 @@
             
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 8;
-            ctx.strokeText("오늘의 급식 이야기", CANVAS_WIDTH / 2, 45);
-            ctx.fillText("오늘의 급식 이야기", CANVAS_WIDTH / 2, 45);
+            ctx.strokeText("오늘의 급식 이야기", CANVAS_WIDTH / 2, 20);
+            ctx.fillText("오늘의 급식 이야기", CANVAS_WIDTH / 2, 20);
 
             // 3. Draw the User Image (Tray)
             const maxImageWidth = CANVAS_WIDTH * 0.45; 
@@ -796,7 +729,7 @@
             drawHeight *= scale;
 
             const startX = (CANVAS_WIDTH - drawWidth) / 2;
-            const startY = 185; // 제목과 식판을 아래로 내려 상하 여백과 균형을 맞춤
+            const startY = 150; // 제목과의 공간을 110에서 150으로 넓힘
 
             // Draw shadow for the tray
             ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
@@ -1159,7 +1092,7 @@
                 inputElem.style.width = `${Math.max(screenWidth + 40, 150)}px`;
                 inputElem.style.height = `${screenHeight + 10}px`;
                 // Scale font size based on canvas scaling, relative to base canvas font size
-                inputElem.style.fontSize = `${33 * currentScale}px`; 
+                inputElem.style.fontSize = `${40 * currentScale}px`; 
             } else {
                 inputElem.style.width = `${Math.max(screenWidth + 40, 200)}px`;
                 inputElem.style.minHeight = `${screenHeight + 20}px`;
