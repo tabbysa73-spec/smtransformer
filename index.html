@@ -87,7 +87,7 @@
         }
         
         .inline-edit-title {
-            font-family: 'Jua', sans-serif;
+            font-family: 'Jua', Nanum+Pen+Script;
             font-size: 26px; /* Base size, will scale */
             color: #333;
             text-align: center;
@@ -955,7 +955,7 @@
     
             // 💡 1. 타이틀 글자의 너비를 화살표를 그리기 '전'에 미리 계산합니다!
             ctx.textAlign = 'center';
-            ctx.font = '33px "Jua", sans-serif'; 
+            ctx.font = '33px "Jua", Nanum Pen Script'; 
             const titleWidth = Math.max(120, ctx.measureText(title).width + 36);
 
             // 💡 2. 화살표 그리기 로직 (위치 동적 보정)
@@ -997,7 +997,7 @@
 
             // --- Draw Title Box ---
             ctx.textAlign = 'center';
-            ctx.font = '33px "Jua", sans-serif'; 
+            ctx.font = '33px "Jua", Nanum Pen Script'; 
             const titleHeight = 50;
             const titleBoxX = x - titleWidth/2;
             const titleBoxY = y - 45;
@@ -1159,7 +1159,7 @@
                 inputElem.style.width = `${Math.max(screenWidth + 40, 150)}px`;
                 inputElem.style.height = `${screenHeight + 10}px`;
                 // Scale font size based on canvas scaling, relative to base canvas font size
-                inputElem.style.fontSize = `${33 * currentScale}px`; 
+                inputElem.style.fontSize = `${32 * currentScale}px`; 
             } else {
                 inputElem.style.width = `${Math.max(screenWidth + 40, 200)}px`;
                 inputElem.style.minHeight = `${screenHeight + 20}px`;
