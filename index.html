@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>오늘의 급식 이야기</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -87,7 +89,7 @@
         }
         
         .inline-edit-title {
-            font-family: 'Jua', Nanum+Pen+Script;
+            font-family: 'Jua', sans-serif;
             font-size: 26px; /* Base size, will scale */
             color: #333;
             text-align: center;
@@ -101,6 +103,12 @@
     </style>
 </head>
 <body class="min-h-screen py-6 px-4 flex flex-col items-center">
+
+    <!-- 💡 웹폰트 사전 로딩 강제 (캔버스 렌더링 시 Jua 폰트 누락 및 시스템 기본체 폴백 현상 방지) -->
+    <div style="position: absolute; left: -9999px; top: -9999px; visibility: hidden; pointer-events: none;" aria-hidden="true">
+        <span style="font-family: 'Jua';">오늘의 급식 이야기 1234567890 맛있는 급식 먹고 건강하게!</span>
+        <span style="font-family: 'Nanum Pen Script';">오늘의 급식 이야기 1234567890 맛있는 급식 먹고 건강하게!</span>
+    </div>
 
     <div id="password-overlay" class="fixed inset-0 bg-pink-50 flex flex-col items-center justify-center z-50">
         <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center mx-4">
@@ -249,6 +257,26 @@
         const canvas = document.getElementById('output-canvas');
         const ctx = canvas.getContext('2d');
         const resultContainer = document.getElementById('result-container');
+
+        // 💡 [웹폰트 사전 로딩] 캔버스에서 Jua 및 손글씨 폰트가 누락되어 기본 시스템 고딕으로 그려지는 현상 완전 방지
+        async function ensureFontsLoaded() {
+            if (!document.fonts) return;
+            try {
+                await Promise.all([
+                    document.fonts.load('76px "Jua"'),
+                    document.fonts.load('32px "Jua"'),
+                    document.fonts.load('26px "Jua"'),
+                    document.fonts.load('36px "Nanum Pen Script"'),
+                    document.fonts.load('32px "Nanum Pen Script"'),
+                    document.fonts.load('40px "Nanum Pen Script"')
+                ]);
+                await document.fonts.ready;
+            } catch (err) {
+                console.warn("Font loading error:", err);
+            }
+        }
+        // 페이지가 열리자마자 백그라운드에서 폰트 즉시 로딩 시작
+        ensureFontsLoaded();
         
         const pasteArea = document.getElementById('paste-area'); 
         const menuInput = document.getElementById('menu-input');
@@ -762,9 +790,8 @@
         }
 
         async function drawFinalImage(userImage, foodData) {
-            if (document.fonts) {
-                await document.fonts.ready;
-            }
+            // 💡 캔버스 렌더링 전 반드시 Jua 폰트 및 손글씨 폰트가 메모리에 로드되었는지 확인/대기
+            await ensureFontsLoaded();
 
             // Clear previous click detection boxes
             drawnBoxes = [];
@@ -955,7 +982,7 @@
     
             // 💡 1. 타이틀 글자의 너비를 화살표를 그리기 '전'에 미리 계산합니다!
             ctx.textAlign = 'center';
-            ctx.font = '33px "Jua", Nanum Pen Script'; 
+            ctx.font = '32px "Jua", sans-serif'; 
             const titleWidth = Math.max(120, ctx.measureText(title).width + 36);
 
             // 💡 2. 화살표 그리기 로직 (위치 동적 보정)
@@ -997,7 +1024,7 @@
 
             // --- Draw Title Box ---
             ctx.textAlign = 'center';
-            ctx.font = '33px "Jua", Nanum Pen Script'; 
+            ctx.font = '32px "Jua", sans-serif'; 
             const titleHeight = 50;
             const titleBoxX = x - titleWidth/2;
             const titleBoxY = y - 45;
@@ -1159,7 +1186,7 @@
                 inputElem.style.width = `${Math.max(screenWidth + 40, 150)}px`;
                 inputElem.style.height = `${screenHeight + 10}px`;
                 // Scale font size based on canvas scaling, relative to base canvas font size
-                inputElem.style.fontSize = `${32 * currentScale}px`; 
+                inputElem.style.fontSize = `${33 * currentScale}px`; 
             } else {
                 inputElem.style.width = `${Math.max(screenWidth + 40, 200)}px`;
                 inputElem.style.minHeight = `${screenHeight + 20}px`;
@@ -1205,7 +1232,7 @@
             editingInput = inputElem;
         }
 
-        function commitEdit() {
+        async function commitEdit() {
             if (!editingInput) return;
 
             const newText = editingInput.value.trim();
@@ -1224,7 +1251,7 @@
 
                 // Redraw canvas with updated data
                 if (currentSelectedImageObj) {
-                    drawFinalImage(currentSelectedImageObj, globalFoodData);
+                    await drawFinalImage(currentSelectedImageObj, globalFoodData);
                 }
             }
             
@@ -1256,7 +1283,8 @@
             ctx.closePath();
         }
 
-        function drawFallbackImage(userImage) {
+        async function drawFallbackImage(userImage) {
+             await ensureFontsLoaded();
              ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
              drawProgrammaticBackground();
              ctx.fillStyle = '#555';
