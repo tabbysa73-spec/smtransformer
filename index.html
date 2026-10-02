@@ -260,20 +260,33 @@
 
         // 💡 [웹폰트 사전 로딩] 캔버스에서 Jua 및 손글씨 폰트가 누락되어 기본 시스템 고딕으로 그려지는 현상 완전 방지
         async function ensureFontsLoaded() {
-            if (!document.fonts) return;
-            try {
-                await Promise.all([
-                    document.fonts.load('76px "Jua"'),
-                    document.fonts.load('32px "Jua"'),
-                    document.fonts.load('26px "Jua"'),
-                    document.fonts.load('36px "Nanum Pen Script"'),
-                    document.fonts.load('32px "Nanum Pen Script"'),
-                    document.fonts.load('40px "Nanum Pen Script"')
-                ]);
-                await document.fonts.ready;
-            } catch (err) {
-                console.warn("Font loading error:", err);
+            if (!document.fonts) {
+                throw new Error('이 브라우저는 글꼴 로딩을 지원하지 않습니다.');
             }
+
+            const titleText = [
+                '오늘의 급식 이야기',
+                ...foodData.map(food => food.name || '')
+            ].join(' ').normalize('NFC');
+
+            const descText = [
+                '맛있는 급식 먹고 건강하게!',
+                'API 통신 문제로 기본 이미지만 표시됩니다.',
+                ...foodData.map(food => food.description || '')
+            ].join(' ').normalize('NFC');
+
+            const results = await Promise.all([
+                document.fonts.load('32px "Jua"', titleText),
+                document.fonts.load('32px "Nanum Pen Script"', descText)
+            ]);
+
+            if (results.some(fonts => fonts.length === 0)) {
+                throw new Error(
+                    '글꼴을 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.'
+                );
+            }
+
+            await document.fonts.ready;
         }
         // 페이지가 열리자마자 백그라운드에서 폰트 즉시 로딩 시작
         ensureFontsLoaded();
@@ -791,7 +804,7 @@
 
         async function drawFinalImage(userImage, foodData) {
             // 💡 캔버스 렌더링 전 반드시 Jua 폰트 및 손글씨 폰트가 메모리에 로드되었는지 확인/대기
-            await ensureFontsLoaded();
+            await ensureFontsLoaded(foodData);
 
             // Clear previous click detection boxes
             drawnBoxes = [];
