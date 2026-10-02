@@ -259,7 +259,7 @@
         const resultContainer = document.getElementById('result-container');
 
         // 💡 [웹폰트 사전 로딩] 캔버스에서 Jua 및 손글씨 폰트가 누락되어 기본 시스템 고딕으로 그려지는 현상 완전 방지
-        async function ensureFontsLoaded() {
+        async function ensureFontsLoaded(foodData = []) {
             if (!document.fonts) {
                 throw new Error('이 브라우저는 글꼴 로딩을 지원하지 않습니다.');
             }
